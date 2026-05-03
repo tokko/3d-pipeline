@@ -1,0 +1,22 @@
+{
+  "_comment": "Drop this into ~/.claude/mcp.json (or merge with your existing one) to register the UnrealMCP server with Claude Code. Edit the absolute path under args[1] to match where you cloned this repo.",
+  "mcpServers": {
+    "unreal_mcp": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "C:/path/to/3d-pipeline/Python",
+        "run",
+        "python",
+        "unreal_mcp_server.py"
+      ],
+      "env": {
+        "UNREAL_MCP_HOST": "127.0.0.1",
+        "UNREAL_MCP_PORT": "55557",
+        "UE_MCP_CLIENT_TIMEOUT_SEC": "300",
+        "UE_MANNEQUIN_SKELETON": "/Game/Characters/Mannequins/Meshes/SK_Mannequin_Skeleton",
+        "UE_MANNEQUIN_IK_RIG": "/Game/Characters/Mannequins/Rigs/IK_Mannequin"
+      }
+    }
+  }
+}

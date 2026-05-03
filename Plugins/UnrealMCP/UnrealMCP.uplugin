@@ -1,0 +1,43 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"FriendlyName": "UnrealMCP",
+	"Description": "Model Context Protocol server for Unreal Engine 5 — extended for the 3d-pipeline asset workflow (FBX import, materials, batch placement, content browser, animation wiring).",
+	"Category": "Editor",
+	"CreatedBy": "tokko/3d-pipeline (forked from chongdashu/unreal-mcp, MIT)",
+	"CreatedByURL": "https://github.com/tokko/3d-pipeline",
+	"DocsURL": "https://github.com/tokko/3d-pipeline",
+	"MarketplaceURL": "",
+	"SupportURL": "",
+	"EngineVersion": "5.5.0",
+	"PythonPath": [
+		"Content/Python"
+	],
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Modules": [
+		{
+			"Name": "UnrealMCP",
+			"Type": "Editor",
+			"LoadingPhase": "PostEngineInit",
+			"PlatformAllowList": [
+				"Win64",
+				"Mac",
+				"Linux"
+			]
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "EditorScriptingUtilities",
+			"Enabled": true
+		},
+		{
+			"Name": "PythonScriptPlugin",
+			"Enabled": true
+		}
+	]
+}
