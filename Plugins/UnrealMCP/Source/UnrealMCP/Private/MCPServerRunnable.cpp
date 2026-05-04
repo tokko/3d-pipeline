@@ -12,7 +12,7 @@
 #include "HAL/PlatformTime.h"
 
 // Buffer size for receiving data
-const int32 BufferSize = 8192;
+const int32 MCP_RECV_BUFFER_SIZE = 8192;
 
 FMCPServerRunnable::FMCPServerRunnable(UUnrealMCPBridge* InBridge, TSharedPtr<FSocket> InListenerSocket)
     : Bridge(InBridge)
@@ -179,8 +179,8 @@ void FMCPServerRunnable::HandleClientConnection(TSharedPtr<FSocket> InClientSock
     UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Set socket to blocking mode"));
     
     // Properly read full message with timeout
-    const int32 MaxBufferSize = 4096;
-    uint8 Buffer[MaxBufferSize];
+    const int32 MaxMCP_RECV_BUFFER_SIZE = 4096;
+    uint8 Buffer[MaxMCP_RECV_BUFFER_SIZE];
     FString MessageBuffer;
     
     UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Starting message receive loop"));
@@ -203,7 +203,7 @@ void FMCPServerRunnable::HandleClientConnection(TSharedPtr<FSocket> InClientSock
         bool bReadSuccess = false;
         
         UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Attempting to receive data..."));
-        bReadSuccess = InClientSocket->Recv(Buffer, MaxBufferSize, BytesRead, ESocketReceiveFlags::None);
+        bReadSuccess = InClientSocket->Recv(Buffer, MaxMCP_RECV_BUFFER_SIZE, BytesRead, ESocketReceiveFlags::None);
         
         UE_LOG(LogTemp, Display, TEXT("MCPServerRunnable: Recv attempt complete - Success=%s, BytesRead=%d"), 
                bReadSuccess ? TEXT("true") : TEXT("false"), BytesRead);

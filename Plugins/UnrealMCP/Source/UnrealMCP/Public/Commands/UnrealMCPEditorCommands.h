@@ -31,4 +31,10 @@ private:
     // Editor viewport commands
     TSharedPtr<FJsonObject> HandleFocusViewport(const TSharedPtr<FJsonObject>& Params);
     TSharedPtr<FJsonObject> HandleTakeScreenshot(const TSharedPtr<FJsonObject>& Params);
+
+    // Level save
+    TSharedPtr<FJsonObject> HandleSaveLevel(const TSharedPtr<FJsonObject>& Params);
+
+    // Static mesh helpers
+    TSharedPtr<FJsonObject> HandleSetActorStaticMesh(const TSharedPtr<FJsonObject>& Params);
 }; 

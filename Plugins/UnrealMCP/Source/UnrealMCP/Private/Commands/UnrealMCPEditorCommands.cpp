@@ -15,6 +15,8 @@
 #include "Engine/PointLight.h"
 #include "Engine/SpotLight.h"
 #include "Camera/CameraActor.h"
+#include "GameFramework/PlayerStart.h"
+#include "FileHelpers.h"
 #include "Components/StaticMeshComponent.h"
 #include "EditorSubsystem.h"
 #include "Subsystems/EditorActorSubsystem.h"
@@ -74,7 +76,15 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleCommand(const FString& C
     {
         return HandleTakeScreenshot(Params);
     }
-    
+    else if (CommandType == TEXT("save_current_level") || CommandType == TEXT("save_all_dirty"))
+    {
+        return HandleSaveLevel(Params);
+    }
+    else if (CommandType == TEXT("set_actor_static_mesh"))
+    {
+        return HandleSetActorStaticMesh(Params);
+    }
+
     return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
 }
 
@@ -200,6 +210,30 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnActor(const TShared
     else if (ActorType == TEXT("CameraActor"))
     {
         NewActor = World->SpawnActor<ACameraActor>(ACameraActor::StaticClass(), Location, Rotation, SpawnParams);
+    }
+    else if (ActorType.Equals(TEXT("PlayerStart"), ESearchCase::IgnoreCase))
+    {
+        NewActor = World->SpawnActor<APlayerStart>(APlayerStart::StaticClass(), Location, Rotation, SpawnParams);
+    }
+    else if (ActorType.Equals(TEXT("SkyAtmosphere"), ESearchCase::IgnoreCase) ||
+             ActorType.Equals(TEXT("SkyLight"), ESearchCase::IgnoreCase))
+    {
+        // Resolve class dynamically — headers not available in binary UE install
+        FString ClassName = TEXT("A") + ActorType;
+        UClass* DynClass = FindFirstObject<UClass>(*ClassName, EFindFirstObjectOptions::None);
+        if (!DynClass)
+        {
+            DynClass = FindFirstObject<UClass>(*ActorType, EFindFirstObjectOptions::None);
+        }
+        if (DynClass && DynClass->IsChildOf(AActor::StaticClass()))
+        {
+            NewActor = World->SpawnActor<AActor>(DynClass, Location, Rotation, SpawnParams);
+        }
+        else
+        {
+            return FUnrealMCPCommonUtils::CreateErrorResponse(
+                FString::Printf(TEXT("Could not resolve actor class: %s"), *ActorType));
+        }
     }
     else
     {
@@ -376,24 +410,110 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorProperty(const T
     
     TSharedPtr<FJsonValue> PropertyValue = Params->Values.FindRef(TEXT("property_value"));
     
-    // Set the property using our utility function
+    // Set the property — try actor first, then its components
     FString ErrorMessage;
-    if (FUnrealMCPCommonUtils::SetObjectProperty(TargetActor, PropertyName, PropertyValue, ErrorMessage))
+    bool bSet = FUnrealMCPCommonUtils::SetObjectProperty(TargetActor, PropertyName, PropertyValue, ErrorMessage);
+    if (!bSet)
     {
-        // Property set successfully
+        TArray<UActorComponent*> Components;
+        TargetActor->GetComponents(Components);
+        for (UActorComponent* Comp : Components)
+        {
+            FString CompError;
+            if (FUnrealMCPCommonUtils::SetObjectProperty(Comp, PropertyName, PropertyValue, CompError))
+            {
+                bSet = true;
+                break;
+            }
+        }
+    }
+
+    if (bSet)
+    {
         TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
         ResultObj->SetStringField(TEXT("actor"), ActorName);
         ResultObj->SetStringField(TEXT("property"), PropertyName);
         ResultObj->SetBoolField(TEXT("success"), true);
-        
-        // Also include the full actor details
         ResultObj->SetObjectField(TEXT("actor_details"), FUnrealMCPCommonUtils::ActorToJsonObject(TargetActor, true));
         return ResultObj;
     }
-    else
+    return FUnrealMCPCommonUtils::CreateErrorResponse(ErrorMessage);
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSaveLevel(const TSharedPtr<FJsonObject>& Params)
+{
+    UWorld* World = GEditor->GetEditorWorldContext().World();
+    if (!World)
     {
-        return FUnrealMCPCommonUtils::CreateErrorResponse(ErrorMessage);
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("No editor world"));
     }
+    UPackage* LevelPackage = World->GetOutermost();
+    // Only save if the level already has a real package path (not transient)
+    if (!LevelPackage || LevelPackage->GetName().StartsWith(TEXT("/Temp/")))
+    {
+        TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+        ResultObj->SetBoolField(TEXT("saved"), false);
+        ResultObj->SetStringField(TEXT("note"), TEXT("Level is unsaved/transient — use Ctrl+S in the editor to save to a path first"));
+        return ResultObj;
+    }
+    bool bSaved = FEditorFileUtils::SaveCurrentLevel();
+    if (bSaved)
+    {
+        TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+        ResultObj->SetBoolField(TEXT("saved"), true);
+        return ResultObj;
+    }
+    return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to save current level"));
+}
+
+TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSetActorStaticMesh(const TSharedPtr<FJsonObject>& Params)
+{
+    FString ActorName;
+    if (!Params->TryGetStringField(TEXT("name"), ActorName))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'name' parameter"));
+    }
+    FString MeshPath;
+    if (!Params->TryGetStringField(TEXT("mesh"), MeshPath))
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'mesh' parameter"));
+    }
+
+    AActor* TargetActor = nullptr;
+    TArray<AActor*> AllActors;
+    UGameplayStatics::GetAllActorsOfClass(GWorld, AActor::StaticClass(), AllActors);
+    for (AActor* Actor : AllActors)
+    {
+        if (Actor && Actor->GetName() == ActorName)
+        {
+            TargetActor = Actor;
+            break;
+        }
+    }
+    if (!TargetActor)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Actor not found: %s"), *ActorName));
+    }
+
+    UStaticMeshComponent* MeshComp = TargetActor->FindComponentByClass<UStaticMeshComponent>();
+    if (!MeshComp)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Actor has no StaticMeshComponent"));
+    }
+
+    UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, *MeshPath);
+    if (!Mesh)
+    {
+        return FUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Failed to load mesh: %s"), *MeshPath));
+    }
+
+    MeshComp->SetStaticMesh(Mesh);
+
+    TSharedPtr<FJsonObject> ResultObj = MakeShared<FJsonObject>();
+    ResultObj->SetStringField(TEXT("actor"), ActorName);
+    ResultObj->SetStringField(TEXT("mesh"), MeshPath);
+    ResultObj->SetBoolField(TEXT("success"), true);
+    return ResultObj;
 }
 
 TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleSpawnBlueprintActor(const TSharedPtr<FJsonObject>& Params)
@@ -584,8 +704,8 @@ TSharedPtr<FJsonObject> FUnrealMCPEditorCommands::HandleTakeScreenshot(const TSh
         
         if (Viewport->ReadPixels(Bitmap, FReadSurfaceDataFlags(), ViewportRect))
         {
-            TArray<uint8> CompressedBitmap;
-            FImageUtils::CompressImageArray(Viewport->GetSizeXY().X, Viewport->GetSizeXY().Y, Bitmap, CompressedBitmap);
+            TArray64<uint8> CompressedBitmap;
+            FImageUtils::PNGCompressImageArray(Viewport->GetSizeXY().X, Viewport->GetSizeXY().Y, Bitmap, CompressedBitmap);
             
             if (FFileHelper::SaveArrayToFile(CompressedBitmap, *FilePath))
             {

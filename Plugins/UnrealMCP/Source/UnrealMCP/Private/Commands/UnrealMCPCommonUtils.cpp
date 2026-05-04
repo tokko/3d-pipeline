@@ -545,7 +545,12 @@ bool FUnrealMCPCommonUtils::SetObjectProperty(UObject* Object, const FString& Pr
     }
     else if (Property->IsA<FFloatProperty>())
     {
-        ((FFloatProperty*)Property)->SetPropertyValue(PropertyAddr, Value->AsNumber());
+        ((FFloatProperty*)Property)->SetPropertyValue(PropertyAddr, (float)Value->AsNumber());
+        return true;
+    }
+    else if (Property->IsA<FDoubleProperty>())
+    {
+        ((FDoubleProperty*)Property)->SetPropertyValue(PropertyAddr, Value->AsNumber());
         return true;
     }
     else if (Property->IsA<FStrProperty>())

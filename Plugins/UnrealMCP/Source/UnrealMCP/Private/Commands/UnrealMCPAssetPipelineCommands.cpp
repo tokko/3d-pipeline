@@ -127,12 +127,18 @@ TSharedPtr<FJsonObject> FUnrealMCPAssetPipelineCommands::HandleCommand(const FSt
         TEXT("unreal_mcp_pipeline.dispatch_to_file(r'%s', r'''%s''', r'%s')\n"),
         *CommandType, *SafeParams, *ResultPath);
 
+    // ExecuteStatement uses Py_single_input which rejects multi-line code.
+    // Write the generated code to a temp .py file and run it as a file instead.
+    const FString TempPyFile = TempDir / FString::Printf(TEXT("dispatch_%s.py"), *FGuid::NewGuid().ToString(EGuidFormats::DigitsWithHyphens));
+    FFileHelper::SaveStringToFile(PyCommand, *TempPyFile, FFileHelper::EEncodingOptions::ForceUTF8);
+
     FPythonCommandEx PyCmd;
-    PyCmd.ExecutionMode = EPythonCommandExecutionMode::ExecuteStatement;
-    PyCmd.Command = PyCommand;
+    PyCmd.ExecutionMode = EPythonCommandExecutionMode::ExecuteFile;
+    PyCmd.Command = TempPyFile;
     PyCmd.Flags = EPythonCommandFlags::None;
 
     const bool bExecOk = PyPlugin->ExecPythonCommandEx(PyCmd);
+    PlatformFile.DeleteFile(*TempPyFile); // clean up temp script
     if (!bExecOk)
     {
         FString ErrMsg = PyCmd.CommandResult;

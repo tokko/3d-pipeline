@@ -1,6 +1,6 @@
 {
 	"FileVersion": 3,
-	"EngineAssociation": "5.5",
+	"EngineAssociation": "5.7",
 	"Category": "",
 	"Description": "Sample project for the UnrealMCP plugin (3d-pipeline fork). The plugin lives at ../Plugins/UnrealMCP and is discovered via AdditionalPluginDirectories.",
 	"Modules": [

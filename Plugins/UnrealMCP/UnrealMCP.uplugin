@@ -10,7 +10,7 @@
 	"DocsURL": "https://github.com/tokko/3d-pipeline",
 	"MarketplaceURL": "",
 	"SupportURL": "",
-	"EngineVersion": "5.5.0",
+	"EngineVersion": "5.7.0",
 	"PythonPath": [
 		"Content/Python"
 	],
